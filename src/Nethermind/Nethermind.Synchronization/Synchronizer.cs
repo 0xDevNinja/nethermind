@@ -273,7 +273,6 @@ public class SynchronizerModule(ISyncConfig syncConfig) : Module
             .AddSingleton<ISyncModeSelector, MultiSyncModeSelector>()
             .AddSingleton<ISyncProgressResolver, SyncProgressResolver>()
             .AddSingleton<ISyncReport, SyncReport>()
-            .AddSingleton<IFullStateFinder, FullStateFinder>()
             .AddSingleton<SyncDbTuner>()
             .AddSingleton<MallocTrimmer>()
             .AddSingleton<ISyncPointers, SyncPointers>()
@@ -324,12 +323,6 @@ public class SynchronizerModule(ISyncConfig syncConfig) : Module
             .AddSingleton<SyncPeerPool>()
                 .Bind<ISyncPeerPool, SyncPeerPool>()
                 .Bind<IPeerDifficultyRefreshPool, SyncPeerPool>()
-
-            .AddSingleton<IPathRecovery, ISyncPeerPool, INodeStorage, ILogManager>((peerPool, nodeStorage, logManager) => new PathNodeRecovery(
-                new NodeDataRecovery(peerPool!, nodeStorage, logManager),
-                new SnapRangeRecovery(peerPool!, logManager),
-                logManager
-            ))
 
             .AddSingleton<ISyncServer, SyncServer>();
 
@@ -384,7 +377,6 @@ public class SynchronizerModule(ISyncConfig syncConfig) : Module
     {
         serviceCollection
             .AddSingleton<ProgressTracker>()
-            .AddSingleton<ISnapTrieFactory, PatriciaSnapTrieFactory>()
             .AddSingleton<ISnapProvider, SnapProvider>()
             .AddSingleton<ISimpleSyncFeed<SnapSyncBatch>, SnapSyncFeed>()
             .AddSingleton<ISyncDownloader<SnapSyncBatch>, SnapSyncDownloader>()
@@ -431,7 +423,6 @@ public class SynchronizerModule(ISyncConfig syncConfig) : Module
     {
         serviceCollection
             .AddSingleton<IStateSyncPivot, StateSyncPivot>()
-            .AddSingleton<ITreeSyncStore, PatriciaTreeSyncStore>()
             .AddSingleton<TreeSync>()
             .AddSingleton<ISimpleSyncFeed<StateSyncBatch>, StateSyncFeed>()
             .AddSingleton<ISyncDownloader<StateSyncBatch>, StateSyncDownloader>()
