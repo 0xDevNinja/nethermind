@@ -31,8 +31,8 @@ namespace Nethermind.Blockchain.Synchronization
         public bool UseGethLimitsInFastBlocks { get; set; } = true;
         public bool FastSync { get => _fastSync || SnapSync; set => _fastSync = value; }
         public bool DownloadHeadersInFastSync { get; set; } = true;
-        public bool DownloadBodiesInFastSync { get; set; } = true;
-        public bool DownloadReceiptsInFastSync { get; set; } = true;
+        public bool DownloadBodiesInFastSync { get; set; } = false;
+        public bool DownloadReceiptsInFastSync { get; set; } = false;
         public long AncientBodiesBarrier { get; set; }
         public long AncientReceiptsBarrier { get; set; }
         public string PivotTotalDifficulty { get; set; }
@@ -58,7 +58,7 @@ namespace Nethermind.Blockchain.Synchronization
         public long? FixTotalDifficultyLastBlock { get; set; } = null;
         public bool StrictMode { get; set; } = false;
         public bool BlockGossipEnabled { get; set; } = true;
-        public bool NonValidatorNode { get; set; } = false;
+        public bool NonValidatorNode { get; set; } = true;
         public ITunableDb.TuneType TuneDbMode { get; set; } = ITunableDb.TuneType.HeavyWrite;
         public ITunableDb.TuneType BlocksDbTuneDbMode { get; set; } = ITunableDb.TuneType.EnableBlobFiles;
         public int MaxProcessingThreads { get; set; }

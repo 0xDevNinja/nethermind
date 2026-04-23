@@ -35,10 +35,10 @@ public interface ISyncConfig : IConfig
     [ConfigItem(Description = "Whether to download the old block headers in the Fast sync mode. If `false`, Nethermind downloads only recent blocks headers.", DefaultValue = "true")]
     bool DownloadHeadersInFastSync { get; set; }
 
-    [ConfigItem(Description = "Whether to download the block bodies in the Fast sync mode.", DefaultValue = "true")]
+    [ConfigItem(Description = "Whether to download the block bodies in the Fast sync mode.", DefaultValue = "false")]
     bool DownloadBodiesInFastSync { get; set; }
 
-    [ConfigItem(Description = "Whether to download receipts in the Fast sync mode. This slows down the process by a few hours but allows to interact with dApps that perform extensive historical logs searches.", DefaultValue = "true")]
+    [ConfigItem(Description = "Whether to download receipts in the Fast sync mode. This slows down the process by a few hours but allows to interact with dApps that perform extensive historical logs searches.", DefaultValue = "false")]
     bool DownloadReceiptsInFastSync { get; set; }
 
     [ConfigItem(Description = "The total difficulty of the pivot block for the Fast sync mode.", DefaultValue = "null")]
@@ -105,7 +105,7 @@ public interface ISyncConfig : IConfig
     [ConfigItem(Description = "Whether to disable some optimizations and do a more extensive sync. Useful when sync state is corrupted.", DefaultValue = "false")]
     public bool StrictMode { get; set; }
 
-    [ConfigItem(Description = $"Whether to operate as a non-validator. If `true`, the `{nameof(DownloadReceiptsInFastSync)}` and `{nameof(DownloadBodiesInFastSync)}` can be set to `false`.", DefaultValue = "false")]
+    [ConfigItem(Description = $"Whether to operate as a non-validator. If `true`, the `{nameof(DownloadReceiptsInFastSync)}` and `{nameof(DownloadBodiesInFastSync)}` can be set to `false`.", DefaultValue = "true")]
     public bool NonValidatorNode { get; set; }
 
     [ConfigItem(Description = "Configure the database for write optimizations during sync. Significantly reduces the total number of writes and sync time if you are not network limited.", DefaultValue = nameof(ITunableDb.TuneType.HeavyWrite), HiddenFromDocs = true)]
