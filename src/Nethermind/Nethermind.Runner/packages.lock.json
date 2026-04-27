@@ -497,20 +497,20 @@
       },
       "PierTwo.Lantern.Discv5.Enr": {
         "type": "Transitive",
-        "resolved": "1.0.0-preview.8",
-        "contentHash": "NI1titqkA2KwIgNdPMJuLPNirgAPTNaL7K7x2Qf6RQpPI6AbMoGO0ny6CL4H/VLMVYQVzT1NzwLqJ78wNeUYJg==",
+        "resolved": "1.0.0-preview.7",
+        "contentHash": "oNF8cPIbYt+8xWoCqPCDfKOEsxhlFUWEXmoV45/XTKipU5ZqvmdTsESCv0o97TP2sNZaZrFrvpovf7aNk3BUKw==",
         "dependencies": {
           "Keccak256": "1.0.0",
           "Multiformats.Base": "2.0.2",
           "Multiformats.Hash": "1.5.0",
           "NBitcoin.Secp256k1": "3.1.5",
-          "PierTwo.Lantern.Discv5.Rlp": "1.0.0-preview.8"
+          "PierTwo.Lantern.Discv5.Rlp": "1.0.0-preview.7"
         }
       },
       "PierTwo.Lantern.Discv5.Rlp": {
         "type": "Transitive",
-        "resolved": "1.0.0-preview.8",
-        "contentHash": "d50BMHF1g7rgcJLJmu7ytqFYRmMfkBkc2VddzTFVmEVPzb2Uk7genfObgwqMtvmHbYk6zQE57f2r5oZwU5B08g=="
+        "resolved": "1.0.0-preview.7",
+        "contentHash": "tAwonG4x8SWFBxd06JvzYNo0xvTsDoM9xfk2tnwIcFzCvY7PORvpOiy9AQcyjqomFQmCNqF4ezwZoRZJV32iQg=="
       },
       "Polly.Core": {
         "type": "Transitive",
@@ -521,11 +521,6 @@
         "type": "Transitive",
         "resolved": "1.8.5",
         "contentHash": "EaCgmntbH1sOzemRTqyXSqYjB6pLH7VCYHhhDYZ59guHSD5qPwhIYa7kfy0QUlmTRt9IXhaXdFhNuBUArp70Ng=="
-      },
-      "prometheus-net": {
-        "type": "Transitive",
-        "resolved": "8.2.1",
-        "contentHash": "3wVgdEPOCBF752s2xps5T+VH+c9mJK8S8GKEDg49084P6JZMumTZI5Te6aJ9MQpX0sx7om6JOnBpIi7ZBmmiDQ=="
       },
       "SimpleBase": {
         "type": "Transitive",
@@ -1017,7 +1012,7 @@
           "Nethermind.Facade": "[1.38.0-unstable, )",
           "Nethermind.Network": "[1.38.0-unstable, )",
           "Nethermind.Network.Enr": "[1.38.0-unstable, )",
-          "PierTwo.Lantern.Discv5.WireProtocol": "[1.0.0-preview.8, )"
+          "PierTwo.Lantern.Discv5.WireProtocol": "[1.0.0-preview.7, )"
         }
       },
       "nethermind.network.dns": {
@@ -1047,13 +1042,13 @@
       "nethermind.opcodetracing.plugin": {
         "type": "Project",
         "dependencies": {
-          "Nethermind.Api": "[1.38.0-unstable, )",
-          "Nethermind.Blockchain": "[1.38.0-unstable, )",
-          "Nethermind.Config": "[1.38.0-unstable, )",
-          "Nethermind.Core": "[1.38.0-unstable, )",
-          "Nethermind.Evm": "[1.38.0-unstable, )",
-          "Nethermind.Logging": "[1.38.0-unstable, )",
-          "Nethermind.Synchronization": "[1.38.0-unstable, )"
+          "Nethermind.Api": "[1.37.0-unstable, )",
+          "Nethermind.Blockchain": "[1.37.0-unstable, )",
+          "Nethermind.Config": "[1.37.0-unstable, )",
+          "Nethermind.Core": "[1.37.0-unstable, )",
+          "Nethermind.Evm": "[1.37.0-unstable, )",
+          "Nethermind.Logging": "[1.37.0-unstable, )",
+          "Nethermind.Synchronization": "[1.37.0-unstable, )"
         }
       },
       "nethermind.optimism": {
@@ -1088,7 +1083,6 @@
       "nethermind.serialization.rlp": {
         "type": "Project",
         "dependencies": {
-          "Ckzg.Bindings": "[2.1.7.1596, )",
           "Nethermind.Core": "[1.38.0-unstable, )",
           "Nethermind.DotNetty.Buffers": "[1.0.2.76, )"
         }
@@ -1156,7 +1150,8 @@
           "Nethermind.State": "[1.38.0-unstable, )",
           "Nethermind.Synchronization": "[1.38.0-unstable, )",
           "Nethermind.Trie": "[1.38.0-unstable, )",
-          "System.IO.Hashing": "[10.0.7, )"
+          "System.IO.Hashing": "[10.0.7, )",
+          "prometheus-net": "[8.2.1, )"
         }
       },
       "nethermind.statecomposition": {
@@ -1591,14 +1586,14 @@
       },
       "PierTwo.Lantern.Discv5.WireProtocol": {
         "type": "CentralTransitive",
-        "requested": "[1.0.0-preview.8, )",
-        "resolved": "1.0.0-preview.8",
-        "contentHash": "mSHH0TEVdN2dQhvVnBrAUbSQiszO4YcjKkCurQJJxzBoYCp6R//ckfRa87fFkdqWKXJFHPJf2fWgd0vSmyB/Cw==",
+        "requested": "[1.0.0-preview.7, )",
+        "resolved": "1.0.0-preview.7",
+        "contentHash": "wfa8Drf8r8Ty8r6cebobxANFmM2h0ckA/fWIKkQCnC+Af91IKFTAtiVhtu5oCjRxY21MLuWxqObV8r+JkKSYrg==",
         "dependencies": {
           "BouncyCastle.Cryptography": "2.4.0",
           "NBitcoin.Secp256k1": "3.1.5",
-          "PierTwo.Lantern.Discv5.Enr": "1.0.0-preview.8",
-          "PierTwo.Lantern.Discv5.Rlp": "1.0.0-preview.8"
+          "PierTwo.Lantern.Discv5.Enr": "1.0.0-preview.7",
+          "PierTwo.Lantern.Discv5.Rlp": "1.0.0-preview.7"
         }
       },
       "Polly": {
@@ -1609,6 +1604,12 @@
         "dependencies": {
           "Polly.Core": "8.6.6"
         }
+      },
+      "prometheus-net": {
+        "type": "CentralTransitive",
+        "requested": "[8.2.1, )",
+        "resolved": "8.2.1",
+        "contentHash": "3wVgdEPOCBF752s2xps5T+VH+c9mJK8S8GKEDg49084P6JZMumTZI5Te6aJ9MQpX0sx7om6JOnBpIi7ZBmmiDQ=="
       },
       "prometheus-net.AspNetCore": {
         "type": "CentralTransitive",
