@@ -12,6 +12,12 @@ namespace Nethermind.State.Flat.Test;
 
 public class PageResidencyTrackerTests
 {
+    // The tracker is 8-way set-associative; tests that need a known eviction outcome use a
+    // single-set tracker (Capacity=8) so every distinct key lands in the same set and the
+    // clock order is fully determined.
+    private const int Ways = 8;
+    private const int OneSetCapacity = Ways;
+
     private sealed class RecordingHandler : IPageEvictionHandler
     {
         public readonly List<(int arena, int page)> Evictions = [];
@@ -28,7 +34,7 @@ public class PageResidencyTrackerTests
     /// Minimal <see cref="IArenaManager"/> stub for <see cref="ArenaByteReader"/> tests:
     /// exposes the supplied tracker via <see cref="PageTracker"/> so an
     /// <see cref="ArenaReservation"/> can call into it directly, and forwards
-    /// <see cref="IArenaManager.AdviseDontNeedPage"/> into <paramref name="handler"/> so test
+    /// <see cref="IArenaManager.QueueEviction"/> into <paramref name="handler"/> so test
     /// assertions on cross-arena evictions still work. Same-arena evictions skip this stub
     /// entirely (the reservation handles them directly off its captured ArenaFile, which is
     /// null in tests so they no-op silently).
@@ -36,7 +42,7 @@ public class PageResidencyTrackerTests
     private sealed unsafe class StubArenaManager(PageResidencyTracker tracker, IPageEvictionHandler handler) : IArenaManager
     {
         public PageResidencyTracker PageTracker => tracker;
-        public void AdviseDontNeedPage(int arenaId, int pageIdx) => handler.OnPageEvicted(arenaId, pageIdx);
+        public void QueueEviction(int arenaId, int pageIdx) => handler.OnPageEvicted(arenaId, pageIdx);
         public int ArenaFileCount => 0;
         public long ArenaMappedBytes => 0;
         public void Initialize(IReadOnlyList<SnapshotCatalog.CatalogEntry> entries) => throw new NotSupportedException();
@@ -70,7 +76,7 @@ public class PageResidencyTrackerTests
     public void Touch_RepeatedSamePage_NeverEvicts()
     {
         RecordingHandler handler = new();
-        PageResidencyTracker tracker = new(maxCapacity: 4);
+        PageResidencyTracker tracker = new(maxCapacity: OneSetCapacity);
 
         for (int i = 0; i < 1000; i++)
             Touch(tracker, 7, 42, handler);
@@ -81,41 +87,94 @@ public class PageResidencyTrackerTests
     }
 
     [Test]
-    public void Touch_SingleSlot_CollisionEvictsOccupant()
+    public void Set_FullWithUnreferencedSlots_NextTouchEvictsClockVictim()
     {
-        // maxCapacity=1 → every distinct key collides on the only slot.
+        // Single-set tracker → all keys land in set 0. Each insert arms REF=1, so the 9th
+        // touch's clock pass clears all 8 REF bits before wrapping back to way 0 (the head)
+        // and evicting (0, 0) — the first inserted key.
         RecordingHandler handler = new();
-        PageResidencyTracker tracker = new(maxCapacity: 1);
+        PageResidencyTracker tracker = new(OneSetCapacity);
 
-        Touch(tracker, 0, 0, handler);
+        for (int i = 0; i < Ways; i++)
+            Touch(tracker, 0, i, handler);
         handler.Evictions.Should().BeEmpty();
-        tracker.ContainsPage(0, 0).Should().BeTrue();
+        tracker.Count.Should().Be(Ways);
 
-        Touch(tracker, 0, 1, handler);
+        Touch(tracker, 0, Ways, handler);
         handler.Evictions.Should().ContainSingle().Which.Should().Be((0, 0));
         tracker.ContainsPage(0, 0).Should().BeFalse();
-        tracker.ContainsPage(0, 1).Should().BeTrue();
-
-        Touch(tracker, 0, 2, handler);
-        handler.Evictions.Should().HaveCount(2);
-        handler.Evictions[1].Should().Be((0, 1));
+        tracker.ContainsPage(0, Ways).Should().BeTrue();
+        tracker.Count.Should().Be(Ways);
     }
 
     [Test]
     public void TryTouch_ReturnsOutcomeAndDisplacedKey()
     {
-        PageResidencyTracker tracker = new(maxCapacity: 1);
+        PageResidencyTracker tracker = new(OneSetCapacity);
 
-        // Empty slot: Inserted, no displaced key.
+        // Empty set: Inserted, no displaced key.
         tracker.TryTouch(0, 0, out _, out _).Should().Be(TouchOutcome.Inserted);
 
-        // Different key on the same slot: Evicted, with displaced key surfaced.
-        tracker.TryTouch(0, 1, out int evictedArenaId, out int evictedPageIdx).Should().Be(TouchOutcome.Evicted);
+        // Re-touching the same key: Hit.
+        tracker.TryTouch(0, 0, out _, out _).Should().Be(TouchOutcome.Hit);
+
+        // Fill the remaining 7 ways — all Inserted.
+        for (int i = 1; i < Ways; i++)
+            tracker.TryTouch(0, i, out _, out _).Should().Be(TouchOutcome.Inserted);
+
+        // Set is full and every way has REF=1. The 9th touch's clock pass clears all 8 REF
+        // bits, then wraps back to way 0 and evicts (0, 0) — the first inserted key.
+        tracker.TryTouch(0, Ways, out int evictedArenaId, out int evictedPageIdx).Should().Be(TouchOutcome.Evicted);
         evictedArenaId.Should().Be(0);
         evictedPageIdx.Should().Be(0);
+    }
 
-        // Re-touching the current occupant: Hit.
-        tracker.TryTouch(0, 1, out _, out _).Should().Be(TouchOutcome.Hit);
+    [Test]
+    public void ReferenceBit_GivesSecondChance()
+    {
+        // Fill the set, then prime the clock with one streaming insert: that pass clears all
+        // 8 REF bits and evicts (0, 0); afterwards way 0 = (0, 8)/REF=1 and ways 1..7 still
+        // hold (0, 1..7) but with REF=0; clock hand sits at way 1.
+        // Re-touching (0, 3) arms way 3's REF. The next three streaming inserts walk the hand
+        // through ways 1, 2 (each REF=0 → evict) and then hit way 3 — REF=1 saves it (clears
+        // the bit and moves on), so the third eviction lands on way 4 instead.
+        // Net evictions: (0, 0), (0, 1), (0, 2), (0, 4). (0, 3) survived the streaming flood.
+        RecordingHandler handler = new();
+        PageResidencyTracker tracker = new(OneSetCapacity);
+
+        for (int i = 0; i < Ways; i++)
+            Touch(tracker, 0, i, handler);
+
+        Touch(tracker, 0, Ways, handler);                       // primes the clock
+        handler.Evictions.Should().Equal((0, 0));
+
+        Touch(tracker, 0, 3, handler);                          // arms way 3's REF bit
+        handler.Evictions.Should().HaveCount(1, "re-touching is a Hit, not an eviction");
+
+        for (int i = 0; i < 3; i++)                             // three more streaming keys
+            Touch(tracker, 0, Ways + 1 + i, handler);
+
+        handler.Evictions.Should().Equal((0, 0), (0, 1), (0, 2), (0, 4));
+        tracker.ContainsPage(0, 3).Should().BeTrue("re-touched key got a second chance");
+    }
+
+    [Test]
+    public void Miss_OnFullSet_ProducesExactlyOneEviction()
+    {
+        // A miss on a full set must displace exactly one entry, regardless of how many REF
+        // bits the clock had to clear before finding an unreferenced way.
+        RecordingHandler handler = new();
+        PageResidencyTracker tracker = new(OneSetCapacity);
+        for (int i = 0; i < Ways; i++)
+            Touch(tracker, 0, i, handler);
+
+        // Re-touch every other entry so the clock has to clear REFs on its way to a victim.
+        for (int i = 0; i < Ways; i += 2)
+            Touch(tracker, 0, i, handler);
+
+        Touch(tracker, 0, Ways, handler);
+        handler.Evictions.Should().ContainSingle();
+        tracker.Count.Should().Be(Ways);
     }
 
     [Test]
@@ -130,18 +189,48 @@ public class PageResidencyTrackerTests
         tracker.ContainsPage(1, 1).Should().BeFalse();
     }
 
-    [Test]
-    public void MaxCapacity_RoundsUpToPowerOfTwo()
+    [TestCase(1, Ways)]
+    [TestCase(Ways, Ways)]
+    [TestCase(Ways + 1, 2 * Ways)]
+    [TestCase(3 * Ways, 4 * Ways)]
+    public void MaxCapacity_RoundsUpToWayMultipleOfPowerOfTwoSets(int requested, int expected)
     {
-        PageResidencyTracker tracker = new(maxCapacity: 3);
-        tracker.MaxCapacity.Should().Be(4);
+        PageResidencyTracker tracker = new(maxCapacity: requested);
+        tracker.MaxCapacity.Should().Be(expected);
+    }
+
+    [Test]
+    public void Forget_RemovesPresentEntry_AndIsNoOpForAbsentOrDisabled()
+    {
+        PageResidencyTracker tracker = new(maxCapacity: OneSetCapacity);
+
+        // Present: insert, then Forget — gone.
+        tracker.TryTouch(5, 3, out _, out _);
+        tracker.ContainsPage(5, 3).Should().BeTrue();
+        tracker.Forget(5, 3);
+        tracker.ContainsPage(5, 3).Should().BeFalse();
+        tracker.Count.Should().Be(0);
+
+        // Absent: Forget on a key the tracker never saw — neighbouring entries survive.
+        tracker.TryTouch(5, 3, out _, out _);
+        tracker.Forget(5, 4);
+        tracker.ContainsPage(5, 3).Should().BeTrue();
+
+        // After REF bit armed (Hit re-arms it), Forget still clears via CAS retry.
+        tracker.TryTouch(5, 3, out _, out _);  // Hit, sets REF=1
+        tracker.Forget(5, 3);
+        tracker.ContainsPage(5, 3).Should().BeFalse();
+
+        // Disabled tracker: no-op, no exception.
+        using PageResidencyTracker disabled = new(maxCapacity: 0);
+        disabled.Forget(5, 3);
     }
 
     [Test]
     public void Clear_RemovesAllEntries()
     {
         RecordingHandler handler = new();
-        PageResidencyTracker tracker = new(maxCapacity: 8);
+        PageResidencyTracker tracker = new(maxCapacity: OneSetCapacity);
         Touch(tracker, 0, 0, handler);
         Touch(tracker, 0, 1, handler);
         Touch(tracker, 0, 2, handler);
@@ -205,16 +294,15 @@ public class PageResidencyTrackerTests
     [Test]
     public unsafe void ArenaByteReader_DispatchesCrossArenaEvictionsToHandler()
     {
-        // maxCapacity=1 → every distinct (arenaId, pageIdx) collides on the only slot.
-        // Use two arenas (5 and 6) on the same shared tracker so the eviction crosses arenas:
-        // the only path that surfaces evictions to the handler now that same-arena evictions
-        // go directly through the reservation's ArenaFile reference (null in tests, so silently
-        // skipped).
+        // Fill the only set with 8 reads from arena 5, then read from arena 6 to force a clock
+        // eviction. The displaced key has arenaId=5, so it crosses arenas and surfaces through
+        // the handler (same-arena evictions go directly through the reservation's ArenaFile,
+        // which is null in tests and silently skipped).
         RecordingHandler handler = new();
-        PageResidencyTracker tracker = new(maxCapacity: 1);
+        PageResidencyTracker tracker = new(maxCapacity: OneSetCapacity);
         StubArenaManager manager = new(tracker, handler);
         int pageSize = Environment.SystemPageSize;
-        byte[] data = new byte[pageSize];
+        byte[] data = new byte[pageSize * (Ways + 1)];
         fixed (byte* dataPtr = data)
         {
             using ArenaReservation r5 = MakeReservation(manager, arenaId: 5, offset: 0, size: data.Length, tag: "r5");
@@ -223,9 +311,11 @@ public class PageResidencyTrackerTests
             ArenaByteReader reader6 = new(dataPtr, data.Length, r6);
 
             Span<byte> b = stackalloc byte[1];
-            reader5.TryRead(0, b).Should().BeTrue();   // primes (5, 0)
-            reader6.TryRead(0, b).Should().BeTrue();   // collides → evicts (5, 0); cross-arena → handler
+            for (int p = 0; p < Ways; p++)
+                reader5.TryRead((long)p * pageSize, b).Should().BeTrue();   // primes (5, 0..7)
+            handler.Evictions.Should().BeEmpty();
 
+            reader6.TryRead(0, b).Should().BeTrue();                        // forces clock eviction of (5, 0)
             handler.Evictions.Should().ContainSingle().Which.Should().Be((5, 0));
         }
     }
@@ -233,12 +323,11 @@ public class PageResidencyTrackerTests
     [Test]
     public unsafe void ArenaByteReader_RepeatedSamePageReads_OnlyTouchOnce()
     {
-        // maxCapacity=1: every Touch lands on the only slot. We probe the memo
-        // by forcing a sentinel back into the slot before each read and checking
-        // whether the next read displaced it. If ArenaByteReader's memo is
-        // working, repeated reads on the same page must NOT call Touch and the
-        // sentinel must remain.
-        PageResidencyTracker tracker = new(maxCapacity: 1);
+        // ArenaByteReader has a per-instance memo keyed on the last touched OS page; repeated
+        // reads inside the same page must skip the per-page Touch loop. We verify by clearing
+        // the tracker after the first read and asserting that subsequent same-page reads do
+        // not repopulate it. Crossing the page boundary must invalidate the memo and re-Touch.
+        PageResidencyTracker tracker = new(maxCapacity: 1024);
         int pageSize = Environment.SystemPageSize;
         byte[] data = new byte[pageSize * 2];
         fixed (byte* dataPtr = data)
@@ -249,29 +338,23 @@ public class PageResidencyTrackerTests
 
             Span<byte> b = stackalloc byte[1];
 
-            // First read materializes (0,0) in the slot.
             reader.TryRead(0, b).Should().BeTrue();
+            tracker.Count.Should().Be(1);
             tracker.ContainsPage(0, 0).Should().BeTrue();
 
-            // 99 more reads on page 0 — memo path must not Touch.
+            tracker.Clear();
             for (int i = 1; i < 100; i++)
-            {
-                Touch(tracker, 99, 99);
                 reader.TryRead(i, b).Should().BeTrue();
-                tracker.ContainsPage(99, 99).Should().BeTrue("memo must skip Touch for same page");
-                tracker.ContainsPage(0, 0).Should().BeFalse();
-            }
+            tracker.Count.Should().Be(0, "memo must skip Touch for repeated reads on the same page");
 
-            // Crossing into page 1 must invalidate the memo and Touch exactly once.
-            Touch(tracker, 99, 99);
+            // Crossing into page 1 must invalidate the memo.
             reader.TryRead(pageSize, b).Should().BeTrue();
-            tracker.ContainsPage(0, 1).Should().BeTrue("page boundary must invalidate the memo");
-            tracker.ContainsPage(99, 99).Should().BeFalse();
+            tracker.Count.Should().Be(1);
+            tracker.ContainsPage(0, 1).Should().BeTrue();
 
-            // Still on page 1 — memo holds again.
-            Touch(tracker, 99, 99);
+            tracker.Clear();
             reader.TryRead(pageSize + 4, b).Should().BeTrue();
-            tracker.ContainsPage(99, 99).Should().BeTrue();
+            tracker.Count.Should().Be(0, "memo holds across reads still on page 1");
         }
     }
 
